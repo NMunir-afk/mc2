@@ -40,6 +40,21 @@ There is no test suite. Verify changes by loading the affected pages in a browse
 | `assets/i18n/<lang>.json` | Translations: maps English text to translated text (see i18n below) |
 | `docs/readme/` | README images only |
 
+### Load order (it matters)
+
+Every page loads scripts in this order:
+
+1. `boot.js` in `<head>`: reads `localStorage["mh:prefs"]` and applies theme, text size, and `lang`/`dir`
+   before first paint. It duplicates a little logic from `core.js` on purpose, because it must run first.
+2. `data.js`: content.
+3. `core.js`: the shared engine, exposed as `window.MH` (see the "Public API" block at the bottom of the file):
+   prefs (`MH.prefs`, `MH.setPrefs`, `MH.onPrefs`), `prayerTimes()`, Hijri (`Intl` `islamic-umalqura` with an
+   arithmetic fallback), Qibla, event occurrence and scoring, the SVG icon set (`MH.icon`), the shared nav and
+   settings/onboarding wizard (`renderChrome`, `openSettings`), and translation.
+4. An inline `<script>` at the bottom of the page that renders it using `MH.*`.
+
+`planner.js` is loaded only by `planner.html`. It is a rule-based planner, deliberately not an LLM.
+
 ## Rules
 
 ### Stack
@@ -53,6 +68,8 @@ There is no test suite. Verify changes by loading the affected pages in a browse
 - Never invent facts about a real mosque, person, or scholar. Placeholder times must set `sample: true`
   so the page shows "Confirm with the mosque."
 - "Ask the Imam" and similar features must never fabricate answers attributed to a real person.
+- The README table "What is real and what is demo" is the source of truth. Keep demo features (chat, donations,
+  planner, mosque applications) clearly labelled, and never collect real payment details.
 
 ### Religious accuracy
 - Prayer times, Hijri dates, and Qibla must stay correct. If you change that math, re-check against
@@ -79,7 +96,8 @@ There is no test suite. Verify changes by loading the affected pages in a browse
 - Mark text that must not be translated (names, Arabic, language names) with `translate="no"`.
 
 ### Privacy
-- No accounts, cookies, analytics, or tracking. User data stays in `localStorage`.
+- No accounts, cookies, analytics, or tracking. User data stays in `localStorage` under `mh:` keys via `MH.store`.
+  Bump `PREFS_VERSION` in `core.js` when stored prefs need a migration.
 - Network calls only to the existing map services (Esri tiles, OpenStreetMap Overpass and Nominatim), and only when the user uses those features.
 - Never commit API keys or secrets. Anything needing a key (e.g. a real AI planner) needs a server; propose it, don't hard-code it.
 
@@ -87,6 +105,11 @@ There is no test suite. Verify changes by loading the affected pages in a browse
 
 - Never commit directly to `main`; it deploys the live site. Work on a branch and open a PR.
 - Branch names: `feat/<short-name>`, `fix/<short-name>`, `docs/<short-name>`.
+- Commit on your branch after each logical unit of work and push it, so progress is never lost.
+- Commit messages match the existing `git log` style: a short, plain-English summary of what changed for the user,
+  e.g. "Fix community chat overflowing the screen on phones". Use an `Area: ...` prefix when it helps
+  (e.g. "Map: calm gray basemap that follows light/dark").
+- Stage specific files, not `git add -A`, so stray local files don't get committed.
 - One task per branch and PR. Keep diffs focused; don't reformat files you didn't otherwise change.
 - Multiple agents may be working at once. Before starting, pull `main`; avoid broad edits to
   `core.js` and `site.css` unless the task needs them, since those are shared by every page.
